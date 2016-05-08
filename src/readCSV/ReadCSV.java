@@ -1,10 +1,13 @@
 package readCSV;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.Writer;
 import java.io.InputStreamReader;
-import java.util.Hashtable;
+import java.io.OutputStreamWriter;
 import java.util.HashMap;
 import java.util.ArrayList;
 
@@ -13,18 +16,18 @@ public class ReadCSV {
 	static HashMap<String, ArrayList<ResourceInfo>> dataTable = new HashMap<String, ArrayList<ResourceInfo>>();
 	
 	public static void main(String args[])
-	{
+	{	
 		try {
             String encoding="GBK";
             File file=new File("/Users/xiayiqian/Downloads/data.csv");
             int i = 0;
-            if(file.isFile() && file.exists()) { //判断文件是否存在
+            if(file.isFile() && file.exists()) { //判断文件是否存在	
                 InputStreamReader read = new InputStreamReader(new FileInputStream(file),encoding);//考虑到编码格式
                 BufferedReader bufferedReader = new BufferedReader(read);
                 String lineTxt = null;
                 String preLineTxt = null;
                 int j = 0;
-                while(((lineTxt = bufferedReader.readLine()) != null) && (j < 100)){
+                while(((lineTxt = bufferedReader.readLine()) != null) && (j < 100000)){
                 	handleLine(i, lineTxt, preLineTxt);
                 	preLineTxt = lineTxt;
                 	i++;
@@ -40,6 +43,8 @@ public class ReadCSV {
 	        System.out.println("读取文件内容出错");
 	        e.printStackTrace();
 	    }
+		
+		writeDataToFile();
 	}
 	
 	public static void handleLine(int index, String line, String preLine) 
@@ -101,7 +106,81 @@ public class ReadCSV {
 		return splitedArr;
 	}
 	
+	public static void writeDataToFile() {
+		
+		BufferedWriter writer = null;
+		try {	
+		    writer = new BufferedWriter(new OutputStreamWriter(
+		          new FileOutputStream("/Users/xiayiqian/Downloads/output.csv"), "utf-8"));
+//		    writer.write("Something");
+//		    writer.newLine();
+//		    writer.write("ehe");
+		    
+		    int matrixSize = dataTable.keySet().size();
+		    String firstRow = "";
+		    
+		    HashMap<String, Integer> urlToIndex = new HashMap<String, Integer>();
+		    int mapIndex = 0;
+		    for (String key:dataTable.keySet()) {
+		    	firstRow += ( ";" + key);
+		    	urlToIndex.put(key, mapIndex);
+		    	mapIndex++;
+		    }
+		    
+		    // 输出矩阵第一行
+		    writer.write(firstRow);
+		    writer.newLine();
+		    
+		    for (String key:dataTable.keySet()) {
+		    	if (dataTable.get(key) == null) {
+		    		String row = key;
+		    		for (int i = 0; i < matrixSize; i++) {
+		    			row += (";" + 0);
+		    		}
+		    		writer.write(row);
+				    writer.newLine();
+		    	}
+		    	else {
+		    		String row = key;
+		    		int countSum = 0;
+		    		boolean hasProbality = false;
+		    		
+		    		for (ResourceInfo info: dataTable.get(key)) {
+		    			countSum += info.getCount();
+		    		}
+		    		for (String url: dataTable.keySet()) {
+		    			hasProbality = false;
+		    			for (ResourceInfo info: dataTable.get(key)) {
+		    				if (url.equals(info.getUrl())) {
+		    					double sum = countSum;
+		    					double fraction = info.getCount() / sum;
+		    					String formatedFraction = String.format("%.5f", fraction);
+		    					row += (";" + formatedFraction);
+		    					hasProbality = true;
+		    					break;
+		    				}
+		    			}
+//		    			row += (";" + 0);
+		    			if (!hasProbality) {
+		    				row += (";" + 0);
+		    			}	
+		    		}
+		    		writer.write(row);
+				    writer.newLine();
+		    	}
+		    }
+		   
+		} catch (Exception ex) {
+			
+		  // report
+		} finally {
+		   try {writer.close();} catch (Exception ex) {/*ignore*/}
+		}
+	}
+	
+	
 	public static void printHashTable (HashMap<String, ArrayList<ResourceInfo>> dataTable) {
+		int urlNumber = 0;
 		for (String key:dataTable.keySet()) {
 			System.out.println("-" + key);
 			ArrayList<ResourceInfo> resourceArr = dataTable.get(key);
@@ -110,6 +189,9 @@ public class ReadCSV {
 					System.out.println("--" + resourceArr.get(i).getUrl() + ": " + resourceArr.get(i).getCount() + "次");
 				}
 			}
+			urlNumber++;
 		}
+		
+		System.out.println("一共有" + urlNumber + "种不同的资源类型");
 	}
 }
