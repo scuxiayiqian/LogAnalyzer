@@ -1,25 +1,41 @@
 package readCSV;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.Writer;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.util.HashMap;
 import java.util.ArrayList;
 
-public class ReadCSV {
-
-	static HashMap<String, ArrayList<ResourceInfo>> dataTable = new HashMap<String, ArrayList<ResourceInfo>>();
+public class CsvReader {
 	
-	public static void main(String args[])
-	{	
-		try {
+	private String inputPath;
+	private String outputPath;
+	
+	private HashMap<String, ArrayList<ResourceInfo>> dataTable = new HashMap<String, ArrayList<ResourceInfo>>();
+	
+	public String getInputPath() {
+		return inputPath;
+	}
+
+	public void setInputPath(String inputPath) {
+		this.inputPath = inputPath;
+	}
+
+	public String getOutputPath() {
+		return outputPath;
+	}
+
+	public void setOutputPath(String outputPath) {
+		this.outputPath = outputPath;
+	}
+	
+    public CsvReader(String inputPath, String outputPath) {
+        this.inputPath = inputPath;
+        this.outputPath = outputPath;
+    }
+    
+    public void readAndWrite() {
+    	try {
             String encoding="GBK";
-            File file=new File("/Users/xiayiqian/Downloads/data.csv");
+            File file=new File(inputPath);
             int i = 0;
             if(file.isFile() && file.exists()) { //判断文件是否存在	
                 InputStreamReader read = new InputStreamReader(new FileInputStream(file),encoding);//考虑到编码格式
@@ -33,7 +49,6 @@ public class ReadCSV {
                 	i++;
                 	j++;
                 }
-                printHashTable(dataTable);
                 read.close();
 		    }
             else {
@@ -43,11 +58,10 @@ public class ReadCSV {
 	        System.out.println("读取文件内容出错");
 	        e.printStackTrace();
 	    }
-		
-		writeDataToFile();
-	}
-	
-	public static void handleLine(int index, String line, String preLine) 
+    
+    }
+
+    public void handleLine(int index, String line, String preLine) 
 	{	
 		String[] formattedLine = formatLine(line);
 		String url = formattedLine[1];
@@ -97,7 +111,7 @@ public class ReadCSV {
 		}
 	}
 	
-	public static String[] formatLine(String lineTxt) {
+	public String[] formatLine(String lineTxt) {
 		int maxSplit = 4;
 		String[] splitedArr = lineTxt.split(",", maxSplit);
 		String[] splitedURL = splitedArr[1].split("/");
@@ -106,15 +120,12 @@ public class ReadCSV {
 		return splitedArr;
 	}
 	
-	public static void writeDataToFile() {
+	public void writeDataToFile() {
 		
 		BufferedWriter writer = null;
 		try {	
 		    writer = new BufferedWriter(new OutputStreamWriter(
-		          new FileOutputStream("/Users/xiayiqian/Downloads/output.csv"), "utf-8"));
-//		    writer.write("Something");
-//		    writer.newLine();
-//		    writer.write("ehe");
+		          new FileOutputStream(outputPath), "utf-8"));
 		    
 		    int matrixSize = dataTable.keySet().size();
 		    String firstRow = "";
@@ -160,7 +171,6 @@ public class ReadCSV {
 		    					break;
 		    				}
 		    			}
-//		    			row += (";" + 0);
 		    			if (!hasProbality) {
 		    				row += (";" + 0);
 		    			}	
@@ -178,8 +188,7 @@ public class ReadCSV {
 		}
 	}
 	
-	
-	public static void printHashTable (HashMap<String, ArrayList<ResourceInfo>> dataTable) {
+	public void printHashTable() {
 		int urlNumber = 0;
 		for (String key:dataTable.keySet()) {
 			System.out.println("-" + key);
@@ -194,4 +203,5 @@ public class ReadCSV {
 		
 		System.out.println("一共有" + urlNumber + "种不同的资源类型");
 	}
+
 }
