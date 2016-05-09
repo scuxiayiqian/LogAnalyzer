@@ -26,4 +26,12 @@ class UrlTransit {
         result = 31 * result + target.hashCode();
         return result;
     }
+
+    public String getSource() {
+        return source;
+    }
+
+    public String getTarget() {
+        return target;
+    }
 }
