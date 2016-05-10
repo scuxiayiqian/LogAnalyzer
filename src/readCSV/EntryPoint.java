@@ -6,13 +6,14 @@ public class EntryPoint {
 	{	
 		CsvReader csvReader;
 		if (args.length == 0) {
-			csvReader = new CsvReader("/Users/xiayiqian/Downloads/data.csv", "/Users/xiayiqian/Downloads/nwe.csv");
+			csvReader = new CsvReader("/Users/xiayiqian/Downloads/data.csv", "/Users/xiayiqian/Downloads/output/");
 		}
 		else {
 			csvReader = new CsvReader(args[0], args[1]);
 		}
-		csvReader.readAndWrite();
+		csvReader.read();
 		csvReader.printHashTable();
+		csvReader.handleDatas();
 		csvReader.writeDataToFile();
 	}
 	
