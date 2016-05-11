@@ -12,9 +12,9 @@ public class EntryPoint {
 			csvReader = new CsvReader(args[0], args[1]);
 		}
 		csvReader.read();
-		csvReader.printHashTable();
 		csvReader.handleDatas();
-		csvReader.writeDataToFile();
+		csvReader.printHashTable();
+		csvReader.writeMatrixToFile();
 	}
 	
 }

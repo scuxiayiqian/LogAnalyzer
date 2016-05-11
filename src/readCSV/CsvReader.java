@@ -9,7 +9,7 @@ public class CsvReader {
 	private String inputPath;
 	private String outputPath;
 	private int interval = 300;
-	private int times = 1000;
+	private int times = 200000;
 	private int groupNumber = -1;
 	private ArrayList<Integer> groupNumberArr = new ArrayList<Integer>();
 	private HashMap<Integer, ArrayList<LogRecord>> logRecordTable = new HashMap<Integer, ArrayList<LogRecord>>();
@@ -44,15 +44,21 @@ public class CsvReader {
             if(file.isFile() && file.exists()) { //判断文件是否存在	
                 InputStreamReader read = new InputStreamReader(new FileInputStream(file),encoding);//考虑到编码格式
                 BufferedReader bufferedReader = new BufferedReader(read);
+                
+           
+                int i = 0;
+                String preLineTxt = null;
                 String lineTxt = null;
                 
-                int i = 0;
                 while(((lineTxt = bufferedReader.readLine()) != null) && (i < times)){
                 	
                 	if (i == 0) {
                 		i++;
                 		continue;
                 	}
+                	
+                	constructDataTable(i, lineTxt, preLineTxt);  // 构造dataTable
+                	preLineTxt = lineTxt;
                 	
                 	groupNumber = getTimeGroup(lineTxt, i);  
                 	if (!groupNumberArr.contains(groupNumber)) {
@@ -73,13 +79,28 @@ public class CsvReader {
 	        e.printStackTrace();
 	    }    
     }
-    
+        
     public void handleDatas() {
     	for (int groupNum:groupNumberArr) {
     		ArrayList<String> userIdArr = new ArrayList<String>();
     		userIdArr = getAllUserId(groupNum);
     		handleDataByGroup(groupNum, userIdArr);
     	}
+    }
+    
+    private void constructDataTable(int index, String line, String preLine)  {
+    	String[] formattedLine = formatLine(line);
+		String url = formattedLine[1];
+		
+		if (index == 1) {
+			dataTable.put(url, null);
+		} 
+		else if (index > 1) {
+			// 如果没有key，就在table中加一个以此行url为key的记录
+			if (!dataTable.containsKey(url)) {
+				dataTable.put(url, null);
+			}
+		}
     }
     
     private ArrayList<String> getAllUserId(int groupNumber) {
@@ -126,21 +147,22 @@ public class CsvReader {
     	
     	for (String userId:userIdArr) {
         	
-        	int time = 0;
+        	boolean firstOneNotFound = true;
         	String lastUrl = null;
         	String currentUrl = null;
             
             for (LogRecord record:logRecords) {
-            	if (record.getUserId().equals(userId) && (time == 0)) {
+            	if (record.getUserId().equals(userId) && (firstOneNotFound)) {
             		lastUrl = record.getURL();
+            		firstOneNotFound = false;
             	}
-            	else if (record.getUserId().equals(userId) && (time != 0)) {
+            	else if (record.getUserId().equals(userId) && (!firstOneNotFound)) {
             		currentUrl = record.getURL();
             		updateDataTable(lastUrl, currentUrl);  // 把当前的记录加到dataTable中去
             		lastUrl = currentUrl;
             	}
-            	time++;
             }
+         
         }
     }
     
@@ -208,9 +230,17 @@ public class CsvReader {
     		logRecordTable.put(groupNumber, null);
     	}
     	
-    	ArrayList<LogRecord> records = logRecordTable.get(groupNumber);	
-    	records.add(record);
-    	logRecordTable.replace(groupNumber, records);
+    	ArrayList<LogRecord> records = logRecordTable.get(groupNumber);	    	
+    	if (records == null) {
+    		records = new ArrayList<LogRecord>();
+			LogRecord rc = new LogRecord(splitedArr[0], splitedArr[1]);
+			records.add(rc);
+			logRecordTable.put(groupNumber, records);
+    	}
+    	else {
+        	records.add(record);
+        	logRecordTable.replace(groupNumber, records);
+    	}
     }
     
     private int getTimeGroup(String lineTxt, int lineNum) {
@@ -241,7 +271,7 @@ public class CsvReader {
 		return splitedArr;
 	}
 	
-	public void writeDataToFile() {
+	public void writeMatrixToFile() {
 		
 		BufferedWriter writer = null;
 		try {	
