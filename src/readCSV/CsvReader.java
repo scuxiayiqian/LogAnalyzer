@@ -1,8 +1,11 @@
 package readCSV;
 
 import java.io.*;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.Date;
 
 public class CsvReader {
 	
@@ -10,9 +13,9 @@ public class CsvReader {
 	private String outputPath;
 	private int interval = 300;
 	private int times = 200000;
-	private int groupNumber = -1;
-	private ArrayList<Integer> groupNumberArr = new ArrayList<Integer>();
-	private HashMap<Integer, ArrayList<LogRecord>> logRecordTable = new HashMap<Integer, ArrayList<LogRecord>>();
+	private String groupNumber = "-1";
+	private ArrayList<String> groupNumberArr = new ArrayList<String>();
+	private HashMap<String, ArrayList<LogRecord>> logRecordTable = new HashMap<String, ArrayList<LogRecord>>();
 	private HashMap<String, ArrayList<ResourceInfo>> dataTable = new HashMap<String, ArrayList<ResourceInfo>>();
 	
 	public String getInputPath() {
@@ -45,10 +48,12 @@ public class CsvReader {
                 InputStreamReader read = new InputStreamReader(new FileInputStream(file),encoding);//考虑到编码格式
                 BufferedReader bufferedReader = new BufferedReader(read);
                 
-           
                 int i = 0;
                 String preLineTxt = null;
                 String lineTxt = null;
+                boolean isNewDay = false;
+                String curDateStr = null;
+                String preDateStr = null;
                 
                 while(((lineTxt = bufferedReader.readLine()) != null) && (i < times)){
                 	
@@ -58,16 +63,70 @@ public class CsvReader {
                 	}
                 	
                 	constructDataTable(i, lineTxt, preLineTxt);  // 构造dataTable
-                	preLineTxt = lineTxt;
                 	
-                	groupNumber = getTimeGroup(lineTxt, i);  
+                	if (i > 0) {
+                		SimpleDateFormat df=new SimpleDateFormat("yyyy-MM-dd");
+                    	String[] splittedLine = this.formatLine(lineTxt);
+                    	
+                    	if (preLineTxt != null) {
+                    		String[] presplittedLine = this.formatLine(preLineTxt);
+                        	
+                            try {
+                    			Date curdate = df.parse(splittedLine[2]);
+                    			Date predate = df.parse(presplittedLine[2]);
+                    			
+                    			int compare = curdate.compareTo(predate);
+                    			System.out.println(compare);
+                    			System.out.println("------");
+                    			
+                    			if (compare == 1) {
+                    				isNewDay = true;
+                    			}
+                    			else if (compare == 0) {
+                    				isNewDay = false;
+                    			}
+                    
+                    			curDateStr = df.format(curdate);
+                    			preDateStr = df.format(predate);
+                    			
+                    			groupNumber = getTimeGroup(lineTxt, preLineTxt, i);  
+//                            	groupNumber = isNewDay? (curDateStr + "-" + groupNumber):(preDateStr + "-" + groupNumber);
+                            	
+                            	if (isNewDay) {
+                            		groupNumber = curDateStr + "-" + groupNumber;
+                            		preLineTxt = null;
+                            	}
+                            	else {
+                            		groupNumber = preDateStr + "-" + groupNumber;
+                            	}
+                    		} catch (ParseException e) {
+                    			// TODO Auto-generated catch block
+                    			e.printStackTrace();
+                    		}
+                    	}
+                    	else {
+                    		try {
+                    			Date curdate = df.parse(splittedLine[2]);
+                    			curDateStr = df.format(curdate);
+                    			
+                    			groupNumber = getTimeGroup(lineTxt, preLineTxt, i);  
+                            	groupNumber = curDateStr + "-" + groupNumber;
+                    		} catch (ParseException e) {
+                    			// TODO Auto-generated catch block
+                    			e.printStackTrace();
+                    		}
+                    	}
+                	} 	
+                	
                 	if (!groupNumberArr.contains(groupNumber)) {
                 		groupNumberArr.add(groupNumber);
                 	}
+                	
                 	parserWrite(groupNumber, lineTxt); // append行到对应group的csv文件中
                 	appendToLogRecordTable(groupNumber, lineTxt);  // 将log以hash<array>的方式存入内存，以便之后分组处理的时候不用再去读文件
-                	i++;
                 	
+                	i++;
+                	preLineTxt = lineTxt;
                 }
                 read.close();
 		    }
@@ -81,7 +140,7 @@ public class CsvReader {
     }
         
     public void handleDatas() {
-    	for (int groupNum:groupNumberArr) {
+    	for (String groupNum:groupNumberArr) {
     		ArrayList<String> userIdArr = new ArrayList<String>();
     		userIdArr = getAllUserId(groupNum);
     		handleDataByGroup(groupNum, userIdArr);
@@ -103,7 +162,7 @@ public class CsvReader {
 		}
     }
     
-    private ArrayList<String> getAllUserId(int groupNumber) {
+    private ArrayList<String> getAllUserId(String groupNumber) {
     	
     	ArrayList<String> userIdArr = new ArrayList<String>();
     	
@@ -141,7 +200,7 @@ public class CsvReader {
     	return null;
     }
     
-    private void handleDataByGroup(int groupNumber, ArrayList<String> userIdArr) {
+    private void handleDataByGroup(String groupNumber, ArrayList<String> userIdArr) {
     	
     	ArrayList<LogRecord> logRecords = logRecordTable.get(groupNumber);
     	
@@ -204,7 +263,7 @@ public class CsvReader {
     /*
      * 把整个日志文件中的数据按300秒一分隔，分别输出到csv文件中
      */
-    private void parserWrite(int index, String line) {
+    private void parserWrite(String index, String line) {
     	BufferedWriter writer = null;
 		try {	
 		    writer = new BufferedWriter(new OutputStreamWriter(
@@ -221,7 +280,7 @@ public class CsvReader {
 		}
     }
     
-    private void appendToLogRecordTable(int groupNumber, String lineTxt) {
+    private void appendToLogRecordTable(String groupNumber, String lineTxt) {
     	
     	String[] splitedArr = formatLine(lineTxt);
     	LogRecord record = new LogRecord(splitedArr[0], splitedArr[1]);
@@ -243,21 +302,38 @@ public class CsvReader {
     	}
     }
     
-    private int getTimeGroup(String lineTxt, int lineNum) {
-    	
-    	int group = -1;
-    	if (lineNum == 0) {
-    		return group;
-    	}
+    private String getTimeGroup(String lineTxt, String preLineTxt, int lineNum) {
     	
     	String[] splittedLine = formatLine(lineTxt);
         String hourMinSec = splittedLine[2].substring(11);
         
+//        String[] presplittedLine = formatLine(preLineTxt);
+//    	
+//    	SimpleDateFormat df=new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+    	
+//		try {
+//			Date curdate = df.parse(splittedLine[2]);
+//			Date predate = df.parse(presplittedLine[2]);
+//			
+//			int compare = curdate.compareTo(predate);
+//			System.out.println(compare);
+//			System.out.println("------");
+//		} catch (ParseException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
+    	
+    	String group = "-1";
+    	if (lineNum == 0) {
+    		return group;
+    	}
+
         int maxSplit = 3;
 		String[] splitedArr = hourMinSec.split(":", maxSplit);
 		
 		int sum = Integer.parseInt(splitedArr[2]) + Integer.parseInt(splitedArr[1]) * 60 + Integer.parseInt(splitedArr[0]) * 3600;
-		group = sum / interval;
+		Integer groupnum = sum / interval;
+		group = groupnum.toString();
 		
         return group;
     }
