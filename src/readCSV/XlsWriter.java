@@ -2,44 +2,16 @@ package readCSV;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFRow;
-import org.apache.poi.hssf.usermodel.HSSFCell;
-
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.HashMap;
-
 
 public class XlsWriter {
 	
-	public XlsWriter() {
-		
-	}
+	private String outputPath = "";
 	
-//	public void createCells() throws IOException {
-//		HSSFWorkbook wb = new HSSFWorkbook();
-//        HSSFSheet sheet = wb.createSheet("new sheet");
-//
-//        for (int i = 0; i < 100; i++) {
-//        	// Create a row and put some cells in it. Rows are 0 based.
-//            HSSFRow row = sheet.createRow(i);
-//            // Create a cell and put a value in it.
-//            HSSFCell cell = row.createCell(0);
-//            cell.setCellValue(2.9);
-//
-//            // Or do it on one line.
-//            row.createCell(1).setCellValue(1.2);
-//            row.createCell(2).setCellValue(1.5);
-//            row.createCell(3).setCellValue(2.5);
-//        }
-//
-//        // Write the output to a file
-//        FileOutputStream fileOut = new FileOutputStream("/Users/xiayiqian/Downloads/workbook.xls");
-//        wb.write(fileOut);
-//        fileOut.close();
-//
-//        wb.close();
-//	}
+	public XlsWriter(String path) {
+		this.outputPath = path;
+	}
 	
 	public void exportToExcel(HashMap<String, Integer> testingDataset, Integer[] predictedTimes, String[] urlArr) {
 		HSSFWorkbook wb = new HSSFWorkbook();
@@ -68,7 +40,7 @@ public class XlsWriter {
         // Write the output to a file
         FileOutputStream fileOut;
 		try {
-			fileOut = new FileOutputStream("/Users/xiayiqian/Downloads/output/finalPrediction.xls");
+			fileOut = new FileOutputStream(outputPath);
 			wb.write(fileOut);
 	        fileOut.close();
 	        wb.close();

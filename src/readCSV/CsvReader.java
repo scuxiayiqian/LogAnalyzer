@@ -4,15 +4,10 @@ import java.io.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
-import java.util.Set;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 
 public class CsvReader {
-	
-	private int predictDataNum = 160000;
-	private int testDataNum = 40000;
 			
 	public double[][] transionMatrix;
 	private String inputPath;
@@ -222,7 +217,7 @@ public class CsvReader {
 									System.out.println("---warning: rsArr is null");
 								}
 								
-								XlsWriter xlsWriter = new XlsWriter();
+								XlsWriter xlsWriter = new XlsWriter(outputPath + "finalPrediction.xls");
 								xlsWriter.exportToExcel(testingDataset, predictedTimes, rsArr);
 								break;
 							}

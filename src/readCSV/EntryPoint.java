@@ -31,7 +31,7 @@ public class EntryPoint {
 		Date timepoint;
 		try {
 			timepoint = df.parse("2016-03-11 07:07:56");  // 设置2 - 从哪个时间点开始分析次数
-			csvReader.collectRSTimes(timepoint, 60000);   // 设置3 - 分析多久时间内的次数
+			csvReader.collectRSTimes(timepoint, 300000);   // 设置3 - 分析多久时间内的次数
 		} catch (ParseException e) {
 			e.printStackTrace();
 			System.out.println("in parse exception");
