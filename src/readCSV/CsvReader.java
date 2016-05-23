@@ -4,24 +4,38 @@ import java.io.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 
 public class CsvReader {
 	
+	private int predictDataNum = 160000;
+	private int testDataNum = 40000;
+			
+	public double[][] transionMatrix;
 	private String inputPath;
 	private String outputPath;
 	private int interval = 300;
-	private int times = 200000;
+	private int times = 0;
 	private String groupNumber = "-1";
 	private ArrayList<String> groupNumberArr = new ArrayList<String>();
 	private HashMap<String, ArrayList<LogRecord>> logRecordTable = new HashMap<String, ArrayList<LogRecord>>();
 	private HashMap<String, ArrayList<ResourceInfo>> dataTable = new HashMap<String, ArrayList<ResourceInfo>>();
 	
+	public void setTimes(int times) {
+		this.times = times;
+	}
+	
+	public int getTimes() {
+		return this.times;
+	}
+	
 	public String getInputPath() {
 		return inputPath;
 	}
-
+	
 	public void setInputPath(String inputPath) {
 		this.inputPath = inputPath;
 	}
@@ -65,7 +79,7 @@ public class CsvReader {
                 	constructDataTable(i, lineTxt, preLineTxt);  // 构造dataTable
                 	
                 	if (i > 0) {
-                		SimpleDateFormat df=new SimpleDateFormat("yyyy-MM-dd");
+                		SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
                     	String[] splittedLine = this.formatLine(lineTxt);
                     	
                     	if (preLineTxt != null) {
@@ -76,8 +90,8 @@ public class CsvReader {
                     			Date predate = df.parse(presplittedLine[2]);
                     			
                     			int compare = curdate.compareTo(predate);
-                    			System.out.println(compare);
-                    			System.out.println("------");
+//                    			System.out.println(compare);
+//                    			System.out.println("------");
                     			
                     			if (compare == 1) {
                     				isNewDay = true;
@@ -138,7 +152,98 @@ public class CsvReader {
 	        e.printStackTrace();
 	    }    
     }
-        
+    
+    // 收集时间点timepoint之前和之后timeInterval时间段的url出现次数
+    public void collectRSTimes(Date timepoint, long timeInterval) {
+    	try {
+            String encoding="GBK";
+            File file=new File(inputPath);
+            
+            if(file.isFile() && file.exists()) { //判断文件是否存在	
+                InputStreamReader read = new InputStreamReader(new FileInputStream(file),encoding);//考虑到编码格式
+                BufferedReader bufferedReader = new BufferedReader(read);
+                
+                int i = 0;
+                String lineTxt = null;
+                
+                HashMap<String, Integer> trainingDataset = new HashMap<String, Integer>();
+                HashMap<String, Integer> testingDataset = new HashMap<String, Integer>();
+                
+                while((lineTxt = bufferedReader.readLine()) != null){
+                	
+                	if (i == 0) {
+                		i++;
+                		continue;
+                	}
+                	                	
+					if (i > 0) {
+						SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+						String[] splittedLine = this.formatLine(lineTxt);
+
+						try {
+							Date curdate = df.parse(splittedLine[2]);
+							String rc = splittedLine[1];   // url name
+							
+							int compare = curdate.compareTo(timepoint);
+							long timeDistance = Math.abs(curdate.getTime() - timepoint.getTime());
+							
+							if (compare < 0 && timeDistance < timeInterval) {	
+								if (trainingDataset.get(rc) == null) {
+									trainingDataset.put(rc, 1);
+								}
+								else {
+									trainingDataset.put(rc, (trainingDataset.get(rc) + 1));
+								}
+							}
+							else if (compare > 0 && timeDistance < timeInterval) {
+								if (testingDataset.get(rc) == null) {
+									testingDataset.put(rc, 1);
+								}
+								else {
+									testingDataset.put(rc, (testingDataset.get(rc) + 1));
+								}
+							}
+							else if (compare > 0 && timeDistance > timeInterval) {
+								
+								String[] rsArr = new String[trainingDataset.size()];
+								Integer[] timeArr = new Integer[trainingDataset.size()];
+								Integer[] predictedTimes = new Integer[trainingDataset.size()];
+								int idx = 0;
+								for (String rs:trainingDataset.keySet()) {
+									rsArr[idx] = rs;
+									timeArr[idx] = trainingDataset.get(rs);
+									idx++;
+								}
+								
+								if (rsArr.length > 0) {
+									predictedTimes = getPredictedResourceTime(timeArr, rsArr, 1);
+								}
+								else {
+									System.out.println("---warning: rsArr is null");
+								}
+								
+								XlsWriter xlsWriter = new XlsWriter();
+								xlsWriter.exportToExcel(testingDataset, predictedTimes, rsArr);
+								break;
+							}
+						} catch (ParseException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
+				}
+                read.close();
+			}
+            else {
+		        System.out.println("找不到指定的文件");
+		    }
+	    } catch (Exception e) {
+	        System.out.println("读取文件内容出错");
+	        e.printStackTrace();
+	    }    
+    }
+
+    
     public void handleDatas() {
     	for (String groupNum:groupNumberArr) {
     		ArrayList<String> userIdArr = new ArrayList<String>();
@@ -306,22 +411,6 @@ public class CsvReader {
     	
     	String[] splittedLine = formatLine(lineTxt);
         String hourMinSec = splittedLine[2].substring(11);
-        
-//        String[] presplittedLine = formatLine(preLineTxt);
-//    	
-//    	SimpleDateFormat df=new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
-    	
-//		try {
-//			Date curdate = df.parse(splittedLine[2]);
-//			Date predate = df.parse(presplittedLine[2]);
-//			
-//			int compare = curdate.compareTo(predate);
-//			System.out.println(compare);
-//			System.out.println("------");
-//		} catch (ParseException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
     	
     	String group = "-1";
     	if (lineNum == 0) {
@@ -349,12 +438,14 @@ public class CsvReader {
 	
 	public void writeMatrixToFile() {
 		
+		int matrixSize = dataTable.keySet().size();
+	    transionMatrix = new double[matrixSize][matrixSize];
 		BufferedWriter writer = null;
+		
 		try {	
 		    writer = new BufferedWriter(new OutputStreamWriter(
 		          new FileOutputStream(outputPath + "matrix.csv"), "utf-8"));
 		    
-		    int matrixSize = dataTable.keySet().size();
 		    String firstRow = "";
 		    
 		    HashMap<String, Integer> urlToIndex = new HashMap<String, Integer>();
@@ -369,11 +460,13 @@ public class CsvReader {
 		    writer.write(firstRow);
 		    writer.newLine();
 		    
+		    int rowIndex = 0;
 		    for (String key:dataTable.keySet()) {
 		    	if (dataTable.get(key) == null) {
 		    		String row = key;
 		    		for (int i = 0; i < matrixSize; i++) {
 		    			row += (";" + 0);
+		    			transionMatrix[rowIndex][i] = 0;
 		    		}
 		    		writer.write(row);
 				    writer.newLine();
@@ -386,25 +479,33 @@ public class CsvReader {
 		    		for (ResourceInfo info: dataTable.get(key)) {
 		    			countSum += info.getCount();
 		    		}
+		    		int colIndex = 0;
 		    		for (String url: dataTable.keySet()) {
 		    			hasProbality = false;
+		    			
 		    			for (ResourceInfo info: dataTable.get(key)) {
 		    				if (url.equals(info.getUrl())) {
 		    					double sum = countSum;
 		    					double fraction = info.getCount() / sum;
 		    					String formatedFraction = String.format("%.5f", fraction);
 		    					row += (";" + formatedFraction);
+		    					
+		    					transionMatrix[rowIndex][colIndex] = fraction;
+		    					
 		    					hasProbality = true;
 		    					break;
 		    				}
 		    			}
 		    			if (!hasProbality) {
 		    				row += (";" + 0);
+		    				transionMatrix[rowIndex][colIndex] = 0;
 		    			}	
+		    			colIndex++;
 		    		}
 		    		writer.write(row);
 				    writer.newLine();
 		    	}
+		    	rowIndex++;
 		    }
 		   
 		} catch (Exception ex) {
@@ -412,6 +513,124 @@ public class CsvReader {
 		  // report
 		} finally {
 		   try {writer.close();} catch (Exception ex) {/*ignore*/}
+		}
+	}
+	
+	public double[][] producePartlyTransitionMatrix(String[] resourceArr) {
+		
+		HashMap<String, ArrayList<ResourceInfo>> partlyDataTable = new HashMap<String, ArrayList<ResourceInfo>>();
+		
+		// 从dataTable中把resourceArr挑出来，把不属于resourceArr中的url删掉
+		for (String resource:resourceArr) {
+			ArrayList<ResourceInfo> resourceInfos = dataTable.get(resource);
+			ArrayList<ResourceInfo> partlyResourceInfos = new ArrayList<ResourceInfo>();
+			
+			if (resourceInfos == null) {
+				partlyDataTable.put(resource, null);
+			}
+			else {
+				for (String singleresource:resourceArr) {
+					for (ResourceInfo info:resourceInfos) {
+						if (info.getUrl().equals(singleresource)) {
+							partlyResourceInfos.add(info);
+						}
+					}
+				}
+				partlyDataTable.put(resource, partlyResourceInfos);
+			}
+		}
+		
+		// 生成新的部分转移矩阵
+		int matrixSize = partlyDataTable.keySet().size();
+		double[][] partlyTransitionMatrix = new double[matrixSize][matrixSize];
+		
+		int rowIndex = 0;
+		for (String key:partlyDataTable.keySet()) {
+	    	if (partlyDataTable.get(key) == null) {
+	    		for (int i = 0; i < matrixSize; i++) {
+	    			partlyTransitionMatrix[rowIndex][i] = 0;
+	    		}
+	    	}
+	    	else {
+	    		int countSum = 0;
+	    		boolean hasProbality = false;
+	    		
+	    		for (ResourceInfo info: partlyDataTable.get(key)) {
+	    			countSum += info.getCount();
+	    		}
+	    		int colIndex = 0;
+	    		for (String url: partlyDataTable.keySet()) {
+	    			hasProbality = false;
+	    			
+	    			for (ResourceInfo info: partlyDataTable.get(key)) {
+	    				if (url.equals(info.getUrl())) {
+	    					double sum = countSum;
+	    					double fraction = info.getCount() / sum;
+	    					partlyTransitionMatrix[rowIndex][colIndex] = fraction;
+	    					
+	    					hasProbality = true;
+	    					break;
+	    				}
+	    			}
+	    			if (!hasProbality) {
+	    				partlyTransitionMatrix[rowIndex][colIndex] = 0;
+	    			}	
+	    			colIndex++;
+	    		}
+	    		
+	    	}
+	    	rowIndex++;
+	    }
+		
+		return partlyTransitionMatrix;
+	}
+	
+	// markovPrediction 
+	public Integer[] getPredictedResourceTime(Integer[] tmArr, String[] rsArr, int predictionTimes) {
+		
+		double[][] predictedMatrix = producePartlyTransitionMatrix(rsArr);
+		Integer[] finaltimes = new Integer[rsArr.length];
+		Integer[] tmpTimes = tmArr;
+		
+		for (int k = 0; k < predictionTimes; k++) {
+			for (int i = 0; i < rsArr.length; i++) {
+				int sum = 0;
+				for (int j = 0; j < rsArr.length; j++) {
+					sum += tmpTimes[j] * predictedMatrix[j][i];
+				}
+				finaltimes[i] = sum;
+			}
+			tmpTimes = finaltimes;
+		}
+		
+		System.out.println("-----资源名");
+		for (String rs:rsArr) {
+			System.out.print(rs + ", ");
+		}
+		
+		System.out.println("-----资源对应的真实出现次数");
+		for (int tm:tmArr) {
+			System.out.print(tm + ", ");
+		}
+		
+		System.out.println("-----对应转移矩阵");
+		printTransitionMatrix(predictedMatrix);
+		
+		System.out.println("-----源对应的预测出现次数");
+		for (int ft:finaltimes) {
+			System.out.print(ft + ", ");
+		}
+		
+		return finaltimes;
+	}
+	
+	public void printTransitionMatrix(double[][] matrix) {
+		System.out.println("-------- bewlow is the probability transition matrix --------");
+		for(double[] numArr:matrix) {
+			for (double num:numArr) {
+				System.out.print(num + " ");
+			}
+			System.out.println();
 		}
 	}
 	
