@@ -149,7 +149,7 @@ public class CsvReader {
     }
     
     // 收集时间点timepoint之前和之后timeInterval时间段的url出现次数
-    public void collectRSTimes(Date timepoint, long timeInterval) {
+    public void collectRSTimes(Date timepoint, long timeInterval, long intervalTimes, double[] weightArr) {
     	try {
             String encoding="GBK";
             File file=new File(inputPath);
@@ -164,6 +164,10 @@ public class CsvReader {
                 HashMap<String, Integer> trainingDataset = new HashMap<String, Integer>();
                 HashMap<String, Integer> testingDataset = new HashMap<String, Integer>();
                 
+                int lastInterval = -1;
+				ArrayList<HashMap<String, Integer>> trainingDatasetArr = new ArrayList< HashMap<String, Integer> >();
+				boolean once = true;
+                
                 while((lineTxt = bufferedReader.readLine()) != null){
                 	
                 	if (i == 0) {
@@ -177,18 +181,61 @@ public class CsvReader {
 
 						try {
 							Date curdate = df.parse(splittedLine[2]);
-							String rc = splittedLine[1];   // url name
+							String rc = splittedLine[1];   //   url name
 							
 							int compare = curdate.compareTo(timepoint);
 							long timeDistance = Math.abs(curdate.getTime() - timepoint.getTime());
 							
-							if (compare < 0 && timeDistance < timeInterval) {	
-								if (trainingDataset.get(rc) == null) {
-									trainingDataset.put(rc, 1);
+//							int newInterval = (int) (timeDistance / timeInterval);
+							int newInterval = (int) Math.ceil((double)timeDistance / timeInterval);
+							
+							if (compare < 0 && timeDistance < (timeInterval * intervalTimes)) {
+								System.out.println("last interval: " + lastInterval);
+								System.out.println("new interval: " + newInterval);
+								System.out.println("---   --- ");
+								
+								if (lastInterval == -1) {
+									if (trainingDataset.get(rc) == null) {
+										trainingDataset.put(rc, 1);
+									}
+									else {
+										trainingDataset.put(rc, (trainingDataset.get(rc) + 1));
+									}
+									lastInterval = newInterval;
 								}
-								else {
-									trainingDataset.put(rc, (trainingDataset.get(rc) + 1));
+								else if (lastInterval == newInterval) {
+									if (trainingDataset.get(rc) == null) {
+										trainingDataset.put(rc, 1);
+									}
+									else {
+										trainingDataset.put(rc, (trainingDataset.get(rc) + 1));
+									}
+									lastInterval = newInterval;
 								}
+								else if (lastInterval == (newInterval + 1)) {
+									HashMap<String, Integer> tmpTrainingDataset = new HashMap<String, Integer>(trainingDataset);
+									trainingDatasetArr.add(tmpTrainingDataset);
+									trainingDataset.clear();
+									
+									if (trainingDataset.get(rc) == null) {
+										trainingDataset.put(rc, 1);
+									}
+									else {
+										trainingDataset.put(rc, (trainingDataset.get(rc) + 1));
+									}
+									lastInterval = newInterval;
+								}
+							}
+							else if (compare == 0 && once) {
+								System.out.println("last interval: " + lastInterval);
+								System.out.println("new interval: " + newInterval);
+								System.out.println("---   --- ");
+								
+								HashMap<String, Integer> tmpTrainingDataset = new HashMap<String, Integer>(trainingDataset);
+								trainingDatasetArr.add(tmpTrainingDataset);
+								trainingDataset.clear();
+								
+								once = false;
 							}
 							else if (compare > 0 && timeDistance < timeInterval) {
 								if (testingDataset.get(rc) == null) {
@@ -200,21 +247,36 @@ public class CsvReader {
 							}
 							else if (compare > 0 && timeDistance > timeInterval) {
 								
-								String[] rsArr = new String[trainingDataset.size()];
-								Integer[] timeArr = new Integer[trainingDataset.size()];
-								Integer[] predictedTimes = new Integer[trainingDataset.size()];
-								int idx = 0;
-								for (String rs:trainingDataset.keySet()) {
-									rsArr[idx] = rs;
-									timeArr[idx] = trainingDataset.get(rs);
-									idx++;
+								ArrayList<HashMap<String, Integer>> finalTrainingMapArr = getPredictedResourceTimeArr (
+										trainingDatasetArr, 
+										weightArr, 
+										weightArr.length);
+								
+								HashMap<String, Integer> finalTrainingSet = new HashMap<String, Integer>();
+								for (HashMap<String, Integer> urlMap:finalTrainingMapArr) {
+									int index = finalTrainingMapArr.indexOf(urlMap);
+									for (String rsName:urlMap.keySet()) {
+										if (finalTrainingSet.get(rsName) == null) {
+											int weightedTimes = (int) (urlMap.get(rsName) * weightArr[index]);
+											finalTrainingSet.put(rsName, weightedTimes);
+										}
+										else {
+											int weightedTimes = (int) (urlMap.get(rsName) * weightArr[index]) + finalTrainingSet.get(rsName);
+											finalTrainingSet.put(rsName, weightedTimes);
+										}
+									}
 								}
 								
-								if (rsArr.length > 0) {
-									predictedTimes = getPredictedResourceTime(timeArr, rsArr, 1);
-								}
-								else {
-									System.out.println("---warning: rsArr is null");
+								System.out.println("~~~" + trainingDatasetArr.size());
+								System.out.println("~~~" + finalTrainingSet.size());
+								
+								String[] rsArr = new String[finalTrainingSet.size()];
+								Integer[] predictedTimes = new Integer[finalTrainingSet.size()];
+								int idx = 0;
+								for (String rs:finalTrainingSet.keySet()) {
+									rsArr[idx] = rs;
+									predictedTimes[idx] = finalTrainingSet.get(rs);
+									idx++;
 								}
 								
 								XlsWriter xlsWriter = new XlsWriter(outputPath + "finalPrediction.xls");
@@ -238,6 +300,99 @@ public class CsvReader {
 	    }    
     }
 
+
+	public ArrayList<HashMap<String, Integer>> getPredictedResourceTimeArr (
+			ArrayList<HashMap<String, Integer>> trainingDatasetArr, 
+			double[] weightArr, 
+			long intervalTimes ) {
+		
+		ArrayList<HashMap<String, Integer>> predictedRSArr = new ArrayList<HashMap<String, Integer>>();
+		if ( weightArr.length != intervalTimes) {
+			System.out.println("weight array's length not equal to interval times!");
+			System.out.println("weightArr length: " + weightArr.length);
+			System.out.println("interval times: " + intervalTimes);
+			
+			System.exit(0);
+		}
+		
+		for (int i = 0; i < trainingDatasetArr.size(); i++) {
+			String[] rsArr = new String[trainingDatasetArr.get(i).size()];
+			Integer[] timeArr = new Integer[trainingDatasetArr.get(i).size()];
+			int idx = 0;
+			for (String rs:trainingDatasetArr.get(i).keySet()) {
+				rsArr[idx] = rs;
+				timeArr[idx] = trainingDatasetArr.get(i).get(rs);
+				idx++;
+			}
+	 		double[][] predictedMatrix = producePartlyTransitionMatrix(rsArr);
+	 		Double[] finaltimes = new Double[rsArr.length];
+	 		Double[] tmpTimes = new Double[trainingDatasetArr.get(i).size()];
+	 		for (int q = 0; q < trainingDatasetArr.get(i).size(); q++) {
+	 			tmpTimes[q] = (double)timeArr[q];
+	 		}
+	 		
+	 		for (int k = 0; k < intervalTimes; k++) {
+	 			for (int p = 0; p < rsArr.length; p++) {
+	 				double sum = 0;
+	 				for (int j = 0; j < rsArr.length; j++) {
+	 					sum += tmpTimes[j] * predictedMatrix[j][p];
+	 				}
+	 				finaltimes[p] = sum;
+	 			}
+	 			tmpTimes = finaltimes;
+	 		}
+	 		
+	 		HashMap<String, Integer> map = new HashMap<String, Integer>();
+	 		int index = 0;
+	 		for (String rs: rsArr) {
+	 			map.put(rs, finaltimes[index].intValue());
+	 			index++;
+	 		}
+	 		predictedRSArr.add(map);
+	 		intervalTimes--;
+		}
+	
+		return predictedRSArr;
+    }
+
+    // markovPrediction 
+// 	public Integer[] getPredictedResourceTime(Integer[] tmArr, String[] rsArr, int predictionTimes) {
+// 		
+// 		double[][] predictedMatrix = producePartlyTransitionMatrix(rsArr);
+// 		Integer[] finaltimes = new Integer[rsArr.length];
+// 		Integer[] tmpTimes = tmArr;
+// 		
+// 		for (int k = 0; k < predictionTimes; k++) {
+// 			for (int i = 0; i < rsArr.length; i++) {
+// 				int sum = 0;
+// 				for (int j = 0; j < rsArr.length; j++) {
+// 					sum += tmpTimes[j] * predictedMatrix[j][i];
+// 				}
+// 				finaltimes[i] = sum;
+// 			}
+// 			tmpTimes = finaltimes;
+// 		}
+// 		
+// 		System.out.println("-----资源名");
+// 		for (String rs:rsArr) {
+// 			System.out.print(rs + ", ");
+// 		}
+// 		
+// 		System.out.println("-----资源对应的真实出现次数");
+// 		for (int tm:tmArr) {
+// 			System.out.print(tm + ", ");
+// 		}
+// 		
+// 		System.out.println("-----对应转移矩阵");
+// 		printTransitionMatrix(predictedMatrix);
+// 		
+// 		System.out.println("-----源对应的预测出现次数");
+// 		for (int ft:finaltimes) {
+// 			System.out.print(ft + ", ");
+// 		}
+// 		
+// 		return finaltimes;
+// 	}
     
     public void handleDatas() {
     	for (String groupNum:groupNumberArr) {
@@ -578,45 +733,6 @@ public class CsvReader {
 	    }
 		
 		return partlyTransitionMatrix;
-	}
-	
-	// markovPrediction 
-	public Integer[] getPredictedResourceTime(Integer[] tmArr, String[] rsArr, int predictionTimes) {
-		
-		double[][] predictedMatrix = producePartlyTransitionMatrix(rsArr);
-		Integer[] finaltimes = new Integer[rsArr.length];
-		Integer[] tmpTimes = tmArr;
-		
-		for (int k = 0; k < predictionTimes; k++) {
-			for (int i = 0; i < rsArr.length; i++) {
-				int sum = 0;
-				for (int j = 0; j < rsArr.length; j++) {
-					sum += tmpTimes[j] * predictedMatrix[j][i];
-				}
-				finaltimes[i] = sum;
-			}
-			tmpTimes = finaltimes;
-		}
-		
-		System.out.println("-----资源名");
-		for (String rs:rsArr) {
-			System.out.print(rs + ", ");
-		}
-		
-		System.out.println("-----资源对应的真实出现次数");
-		for (int tm:tmArr) {
-			System.out.print(tm + ", ");
-		}
-		
-		System.out.println("-----对应转移矩阵");
-		printTransitionMatrix(predictedMatrix);
-		
-		System.out.println("-----源对应的预测出现次数");
-		for (int ft:finaltimes) {
-			System.out.print(ft + ", ");
-		}
-		
-		return finaltimes;
 	}
 	
 	public void printTransitionMatrix(double[][] matrix) {
