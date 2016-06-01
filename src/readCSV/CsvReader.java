@@ -185,7 +185,10 @@ public class CsvReader {
 							
 							int compare = curdate.compareTo(timepoint);
 							long timeDistance = Math.abs(curdate.getTime() - timepoint.getTime());
+							int lastInterval = -1;
+							ArrayList<HashMap<String, Integer>> trainingDatasetArr = new ArrayList< HashMap<String, Integer> >();
 							
+<<<<<<< HEAD
 //							int newInterval = (int) (timeDistance / timeInterval);
 							int newInterval = (int) Math.ceil((double)timeDistance / timeInterval);
 							
@@ -194,6 +197,11 @@ public class CsvReader {
 								System.out.println("new interval: " + newInterval);
 								System.out.println("---   --- ");
 								
+=======
+							if (compare < 0 && timeDistance < (timeInterval * intervalTimes)) {
+								int newInterval = (int) (timeDistance / timeInterval);
+								System.out.println("interval: " + newInterval);
+>>>>>>> a925a88d86f90db1c9a8276991a2cc1a3217a95c
 								if (lastInterval == -1) {
 									if (trainingDataset.get(rc) == null) {
 										trainingDataset.put(rc, 1);
@@ -212,9 +220,14 @@ public class CsvReader {
 									}
 									lastInterval = newInterval;
 								}
+<<<<<<< HEAD
 								else if (lastInterval == (newInterval + 1)) {
 									HashMap<String, Integer> tmpTrainingDataset = new HashMap<String, Integer>(trainingDataset);
 									trainingDatasetArr.add(tmpTrainingDataset);
+=======
+								else if (lastInterval != newInterval) {
+									trainingDatasetArr.add(trainingDataset);
+>>>>>>> a925a88d86f90db1c9a8276991a2cc1a3217a95c
 									trainingDataset.clear();
 									
 									if (trainingDataset.get(rc) == null) {
@@ -267,9 +280,12 @@ public class CsvReader {
 									}
 								}
 								
+<<<<<<< HEAD
 								System.out.println("~~~" + trainingDatasetArr.size());
 								System.out.println("~~~" + finalTrainingSet.size());
 								
+=======
+>>>>>>> a925a88d86f90db1c9a8276991a2cc1a3217a95c
 								String[] rsArr = new String[finalTrainingSet.size()];
 								Integer[] predictedTimes = new Integer[finalTrainingSet.size()];
 								int idx = 0;
@@ -325,6 +341,7 @@ public class CsvReader {
 				idx++;
 			}
 	 		double[][] predictedMatrix = producePartlyTransitionMatrix(rsArr);
+<<<<<<< HEAD
 	 		Double[] finaltimes = new Double[rsArr.length];
 	 		Double[] tmpTimes = new Double[trainingDatasetArr.get(i).size()];
 	 		for (int q = 0; q < trainingDatasetArr.get(i).size(); q++) {
@@ -334,6 +351,14 @@ public class CsvReader {
 	 		for (int k = 0; k < intervalTimes; k++) {
 	 			for (int p = 0; p < rsArr.length; p++) {
 	 				double sum = 0;
+=======
+	 		Integer[] finaltimes = new Integer[rsArr.length];
+	 		Integer[] tmpTimes = timeArr;
+	 		
+	 		for (int k = 0; k < intervalTimes; k++) {
+	 			for (int p = 0; p < rsArr.length; p++) {
+	 				int sum = 0;
+>>>>>>> a925a88d86f90db1c9a8276991a2cc1a3217a95c
 	 				for (int j = 0; j < rsArr.length; j++) {
 	 					sum += tmpTimes[j] * predictedMatrix[j][p];
 	 				}
@@ -345,7 +370,11 @@ public class CsvReader {
 	 		HashMap<String, Integer> map = new HashMap<String, Integer>();
 	 		int index = 0;
 	 		for (String rs: rsArr) {
+<<<<<<< HEAD
 	 			map.put(rs, finaltimes[index].intValue());
+=======
+	 			map.put(rs, finaltimes[index]);
+>>>>>>> a925a88d86f90db1c9a8276991a2cc1a3217a95c
 	 			index++;
 	 		}
 	 		predictedRSArr.add(map);
